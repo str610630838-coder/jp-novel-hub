@@ -17,7 +17,7 @@ const state = {
   // 分页状态
   currentPage: 0,        // 当前页（0-based）
   totalPages: 1,         // 本章总页数
-  pageWidth: 0,          // 单页宽度（px）
+  pageHeight: 0,         // 单页高度（px）
 
   // 阅读偏好
   fontSize: 17,
@@ -137,24 +137,21 @@ function calcAndGo(targetPage) {
   const viewport = elViewport();
   const canvas   = elCanvas();
 
-  const vw = viewport.clientWidth;
   const vh = viewport.clientHeight;
-  state.pageWidth = vw;
+  state.pageHeight = vh;
 
-  // 设置 column-width = 视口宽（每列=1页）
-  canvas.style.columnWidth = vw + 'px';
-  canvas.style.height      = vh + 'px';
+  // 清除旧的 column 布局残留，让内容自然流高
+  canvas.style.columnWidth = '';
+  canvas.style.height      = '';
+  canvas.style.transform   = '';
 
-  // 读取 scrollWidth 来计算总页数
-  // 再给一帧让 columns 布局完成
+  // 再给一帧让浏览器完成布局后读取真实高度
   requestAnimationFrame(() => {
-    const totalWidth = canvas.scrollWidth;
-    state.totalPages = Math.max(1, Math.round(totalWidth / vw));
+    const totalHeight = canvas.scrollHeight;
+    state.totalPages = Math.max(1, Math.ceil(totalHeight / vh));
 
-    // 打开动画
     canvas.classList.remove('instant');
 
-    // 跳到目标页（无动画）
     goToPage(Math.min(targetPage, state.totalPages - 1), false);
     updatePageInfo();
     updateNavBtns();
@@ -168,11 +165,10 @@ function goToPage(n, animate = true) {
 
   if (!animate) {
     canvas.classList.add('instant');
-    canvas.style.transform = `translateX(-${state.currentPage * state.pageWidth}px)`;
-    // 下一帧恢复动画
+    canvas.style.transform = `translateY(-${state.currentPage * state.pageHeight}px)`;
     requestAnimationFrame(() => canvas.classList.remove('instant'));
   } else {
-    canvas.style.transform = `translateX(-${state.currentPage * state.pageWidth}px)`;
+    canvas.style.transform = `translateY(-${state.currentPage * state.pageHeight}px)`;
   }
 
   updatePageInfo();
@@ -401,6 +397,7 @@ function showPageError(htmlMsg) {
   elCanvas().style.columnWidth = '';
   elCanvas().style.height      = '';
   elCanvas().style.transform   = '';
+  elCanvas().style.width       = '';
   elCanvas().innerHTML = `
     <div class="page-error">
       <span style="font-size:40px">⚠️</span>
@@ -431,22 +428,21 @@ function bindEvents() {
     s.addEventListener('click', () => changeReaderTheme(s.dataset.theme));
   });
 
-  // ── 点击翻页（左1/3 上一页 | 右1/3 下一页 | 中间 显隐导航）──
+  // ── 点击翻页（上1/3 上一页 | 下1/3 下一页 | 中间 显隐导航）──
   elViewport()?.addEventListener('click', e => {
-    // 若设置面板开着，先关闭
     if (state.settingsOpen) {
       state.settingsOpen = false;
       document.getElementById('settings-panel')?.classList.remove('open');
       return;
     }
-    const vw   = elViewport().clientWidth;
-    const zone = e.clientX / vw;
+    const vh   = elViewport().clientHeight;
+    const zone = e.clientY / vh;
     if (zone < 0.3)      prevPage();
     else if (zone > 0.7) nextPage();
     else                 toggleNav();
   });
 
-  // ── 触摸滑动翻页 ──
+  // ── 触摸滑动翻页（上下滑）──
   let touchStartX = 0, touchStartY = 0;
   elViewport()?.addEventListener('touchstart', e => {
     touchStartX = e.touches[0].clientX;
@@ -455,15 +451,15 @@ function bindEvents() {
   elViewport()?.addEventListener('touchend', e => {
     const dx = e.changedTouches[0].clientX - touchStartX;
     const dy = e.changedTouches[0].clientY - touchStartY;
-    if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 40) {
-      dx < 0 ? nextPage() : prevPage();
+    if (Math.abs(dy) > Math.abs(dx) && Math.abs(dy) > 40) {
+      dy < 0 ? nextPage() : prevPage();
     }
   }, { passive: true });
 
   // ── 键盘翻页 ──
   document.addEventListener('keydown', e => {
-    if (['ArrowRight', 'PageDown', ' '].includes(e.key)) { e.preventDefault(); nextPage(); }
-    if (['ArrowLeft',  'PageUp'].includes(e.key))        { e.preventDefault(); prevPage(); }
+    if (['ArrowDown', 'ArrowRight', 'PageDown', ' '].includes(e.key)) { e.preventDefault(); nextPage(); }
+    if (['ArrowUp',   'ArrowLeft',  'PageUp'].includes(e.key))        { e.preventDefault(); prevPage(); }
   });
 
   // ── 窗口大小改变重新分页 ──
