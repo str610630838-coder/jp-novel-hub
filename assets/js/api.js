@@ -73,39 +73,85 @@ const NarouAPI = {
     };
   },
 
+  _parseChaptersFromDoc(doc, chapters, chapterTitleRef) {
+    let currentChapterTitle = chapterTitleRef.value || '';
+
+    const newList = doc.querySelectorAll('.p-eplist > *');
+    if (newList.length > 0) {
+      newList.forEach(el => {
+        if (el.matches('.p-eplist__chapter-title')) {
+          currentChapterTitle = el.textContent.trim();
+        } else if (el.matches('.p-eplist__sublist')) {
+          const link = el.querySelector('a.p-eplist__subtitle, a');
+          if (link) {
+            const m = (link.getAttribute('href') || '').match(/\/(\d+)\/?$/);
+            chapters.push({
+              num: m ? parseInt(m[1]) : chapters.length + 1,
+              title: link.textContent.trim(),
+              chapterTitle: currentChapterTitle,
+            });
+          }
+        }
+      });
+    } else {
+      doc.querySelectorAll('.novel_sublist2 > *').forEach(el => {
+        if (el.matches('.chapter_title')) {
+          currentChapterTitle = el.textContent.trim();
+        } else if (el.matches('.subtitle')) {
+          const link = el.querySelector('a');
+          if (link) {
+            const m = (link.getAttribute('href') || '').match(/\/(\d+)\/?$/);
+            chapters.push({
+              num: m ? parseInt(m[1]) : chapters.length + 1,
+              title: link.textContent.trim(),
+              chapterTitle: currentChapterTitle,
+            });
+          }
+        }
+      });
+    }
+
+    chapterTitleRef.value = currentChapterTitle;
+  },
+
   async getChapterList(ncode) {
-    const url = `${CONFIG.sources.narou.readerBase}${ncode}/`;
-    const html = await proxyFetchText(url);
+    const baseUrl = `${CONFIG.sources.narou.readerBase}${ncode}/`;
+    const html = await proxyFetchText(baseUrl);
     const doc = parseDoc(html);
 
-    const title = doc.querySelector('.novel_title')?.textContent?.trim() || '';
-    const authorEl = doc.querySelector('.novel_writername a, .novel_writername');
+    const title = doc.querySelector('.p-novel__title, .novel_title')?.textContent?.trim() || '';
+    const authorEl = doc.querySelector('.p-novel__author a, .p-novel__author, .novel_writername a, .novel_writername');
     const author = authorEl?.textContent?.trim() || '';
-    const synopsis = doc.querySelector('#novel_ex')?.textContent?.trim() || '';
+    const synopsis = doc.querySelector('.p-novel__summary, #novel_ex')?.textContent?.trim() || '';
 
-    // 短篇
-    const isSingle = !!doc.querySelector('#novel_honbun');
+    // 短篇：新版用 .p-novel__body，旧版用 #novel_honbun
+    const isSingle = !!doc.querySelector('.p-novel__body, #novel_honbun');
     if (isSingle) {
       return { title, author, synopsis, isSingle: true, chapters: [{ num: null, title, chapterTitle: '' }] };
     }
 
     const chapters = [];
-    let currentChapterTitle = '';
-    doc.querySelectorAll('.novel_sublist2 > *').forEach(el => {
-      if (el.matches('.chapter_title')) {
-        currentChapterTitle = el.textContent.trim();
-      } else if (el.matches('.subtitle')) {
-        const link = el.querySelector('a');
-        if (link) {
-          const m = (link.getAttribute('href') || '').match(/\/(\d+)\/?$/);
-          chapters.push({
-            num: m ? parseInt(m[1]) : chapters.length + 1,
-            title: link.textContent.trim(),
-            chapterTitle: currentChapterTitle,
-          });
+    const chapterTitleRef = { value: '' };
+    this._parseChaptersFromDoc(doc, chapters, chapterTitleRef);
+
+    // 处理分页：获取最后一页编号
+    const lastPageLink = doc.querySelector('.c-pager__item--last');
+    if (lastPageLink) {
+      const lastHref = lastPageLink.getAttribute('href') || '';
+      const lastPageM = lastHref.match(/[?&]p=(\d+)/);
+      const totalPages = lastPageM ? parseInt(lastPageM[1]) : 1;
+
+      if (totalPages > 1) {
+        const pagePromises = [];
+        for (let p = 2; p <= totalPages; p++) {
+          pagePromises.push(proxyFetchText(`${baseUrl}?p=${p}`));
         }
+        const pageHtmls = await Promise.all(pagePromises);
+        pageHtmls.forEach(ph => {
+          this._parseChaptersFromDoc(parseDoc(ph), chapters, chapterTitleRef);
+        });
       }
-    });
+    }
 
     return { title, author, synopsis, isSingle: false, chapters };
   },
@@ -116,19 +162,22 @@ const NarouAPI = {
     const html = await proxyFetchText(url);
     const doc = parseDoc(html);
 
-    const title = doc.querySelector('.novel_subtitle')?.textContent?.trim() ||
-                  doc.querySelector('.novel_title')?.textContent?.trim() || '';
+    const title = doc.querySelector('.p-novel__title--rensai, .p-novel__title, .novel_subtitle, .novel_title')?.textContent?.trim() || '';
     const sanitize = (el) => {
       if (!el) return '';
       el.querySelectorAll('script, style, [id^="ad"], .novel_bn, .ss').forEach(e => e.remove());
       return el.innerHTML;
     };
 
+    // 新版：正文 = .p-novel__text（排除后记），后记 = .p-novel__text--afterword
+    const newBody = doc.querySelector('.js-novel-text.p-novel__text:not(.p-novel__text--afterword), .p-novel__text:not(.p-novel__text--afterword)');
+    const newAfterword = doc.querySelector('.p-novel__text--afterword');
+
     return {
       title,
       preface: sanitize(doc.querySelector('#novel_p')),
-      body: sanitize(doc.querySelector('#novel_honbun')),
-      afterword: sanitize(doc.querySelector('#novel_a')),
+      body: sanitize(newBody || doc.querySelector('#novel_honbun')),
+      afterword: sanitize(newAfterword || doc.querySelector('#novel_a')),
     };
   },
 };
