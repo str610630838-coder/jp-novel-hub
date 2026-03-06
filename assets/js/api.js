@@ -196,7 +196,14 @@ const AozoraAPI = {
       textUrl = h.startsWith('http') ? h : `${CONFIG.sources.aozora.cardBase}/cards/${personId}/${h.replace(/^\.\//, '')}`;
     }
 
-    return { title, author, synopsis: note, textUrl };
+    return {
+      title,
+      author,
+      synopsis: note,
+      textUrl,
+      isSingle: true,
+      chapters: [{ num: null, id: 'main', title: title || '正文', chapterTitle: '' }],
+    };
   },
 
   async getContent(textUrl) {

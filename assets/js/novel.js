@@ -44,7 +44,8 @@ function renderSkeletonDetail() {
 }
 
 function renderDetail(data) {
-  const { source, id, title, author, synopsis, isSingle, chapters } = data;
+  const { source, id, title, author, synopsis, isSingle } = data;
+  const chapters = data.chapters || [];
   const src = CONFIG.sources[source] || {};
   const coverColor = getCoverColor(id);
   const progress = Storage.getReadProgress(source, id);
@@ -103,7 +104,11 @@ function renderDetail(data) {
       const prog = Storage.getReadProgress(source, id);
       const idx = prog.chapterIdx || 0;
       const ch = allChapters[idx] || allChapters[0];
-      if (ch) goToReader(source, id, ch.num || ch.id, idx);
+      if (ch) {
+        goToReader(source, id, ch.num || ch.id, idx);
+      } else {
+        showToast('章节列表尚未加载，请稍候再试');
+      }
     }
   });
 }
