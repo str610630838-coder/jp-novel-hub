@@ -1,53 +1,41 @@
 'use strict';
 
 /* =====================================================
-   翻页阅读器 - 核心逻辑
-   原理：CSS multi-column 将内容自动排进多个等宽列，
-         通过 translateX 水平滑动实现翻页。
+   滚动阅读器 - 核心逻辑
+   一章一加载，自然滚动，进度条跟随滚动位置。
    ===================================================== */
 
 const state = {
-  // 书籍定位
   source: '',
   novelId: '',
   chapterId: null,
   chapterIdx: 0,
-  chapters: [],          // 完整章节列表
+  chapters: [],
 
-  // 分页状态
-  currentPage: 0,        // 当前页（0-based）
-  totalPages: 1,         // 本章总页数
-  pageHeight: 0,         // 单页高度（px）
-
-  // 阅读偏好
   fontSize: 17,
   lineHeight: 2.0,
   readerTheme: 'dark',
 
-  // UI 状态
   navVisible: true,
   settingsOpen: false,
   isLoading: false,
 };
 
 // ===== DOM 引用 =====
-const elViewport  = () => document.getElementById('page-viewport');
-const elCanvas    = () => document.getElementById('page-canvas');
-const elProgress  = () => document.getElementById('progress-fill');
-const elPrev      = () => document.getElementById('btn-prev');
-const elNext      = () => document.getElementById('btn-next');
-const elPageNum   = () => document.getElementById('page-num-display');
-const elPageCh    = () => document.getElementById('page-chapter-display');
-const elChTitle   = () => document.getElementById('reader-chapter-title');
+const elContent  = () => document.getElementById('reader-content');
+const elProgress = () => document.getElementById('progress-fill');
+const elPrev     = () => document.getElementById('btn-prev');
+const elNext     = () => document.getElementById('btn-next');
+const elChTitle  = () => document.getElementById('reader-chapter-title');
+const elChInfo   = () => document.getElementById('chapter-info-display');
 
 // ===== 初始化 =====
 async function init() {
   initTheme();
 
-  // 读取用户偏好
-  state.fontSize    = Storage.get('reader_fontSize',    17);
-  state.lineHeight  = Storage.get('reader_lineHeight',  2.0);
-  state.readerTheme = Storage.get('reader_theme',      'dark');
+  state.fontSize    = Storage.get('reader_fontSize',   17);
+  state.lineHeight  = Storage.get('reader_lineHeight', 2.0);
+  state.readerTheme = Storage.get('reader_theme',     'dark');
 
   const params = getParams();
   state.source    = params.source || '';
@@ -55,17 +43,17 @@ async function init() {
   state.chapterId = params.chapter ? decodeURIComponent(params.chapter) : null;
   state.chapterIdx = parseInt(params.idx) || 0;
 
-  if (!state.source || !state.novelId) { showPageError('参数错误，请从首页重新进入'); return; }
+  if (!state.source || !state.novelId) { showContentError('参数错误，请从首页重新进入'); return; }
 
   applyReaderTheme();
   bindEvents();
 
-  // 并行：获取章节目录 + 加载章节内容
   getChapterList(state.source, state.novelId).then(info => {
     state.chapters = info.chapters || [];
     const backEl = document.getElementById('btn-back');
     if (backEl) backEl.textContent = `← ${info.title || '返回'}`;
-    updatePageInfo();
+    updateChapterInfo();
+    updateNavBtns();
   }).catch(e => console.warn('获取目录失败:', e));
 
   await loadChapter();
@@ -76,7 +64,8 @@ async function loadChapter() {
   if (state.isLoading) return;
   state.isLoading = true;
 
-  elCanvas().innerHTML = `
+  const content = elContent();
+  content.innerHTML = `
     <div class="page-loading">
       <div class="spinner"></div>
       <span>正在加载章节内容…</span>
@@ -85,114 +74,44 @@ async function loadChapter() {
   elPrev().disabled = true;
   elNext().disabled = true;
 
+  // 滚回顶部
+  window.scrollTo({ top: 0, behavior: 'instant' });
+
   try {
     const chId = (!state.chapterId || state.chapterId === 'null') ? null : state.chapterId;
     const data  = await getChapterContent(state.source, state.novelId, chId);
 
-    // 更新标题
     const title = data.title || '';
     document.title = title ? `${title} · 日文小说` : '日文小说';
     if (elChTitle()) elChTitle().textContent = title;
 
-    // 构造 HTML（注意：内容在同一 canvas 里，由 CSS columns 自动分页）
-    let html = `<p class="ch-title">${escHtml(title)}</p>`;
+    let html = `<h1 class="ch-title">${escHtml(title)}</h1>`;
     if (data.preface) html += `<div class="reader-foreword">${data.preface}</div><hr>`;
     html += data.body || '<p>（本章内容为空）</p>';
     if (data.afterword) html += `<hr><div class="reader-afterword">${data.afterword}</div>`;
 
-    // 渲染并等待字体 + 布局稳定后再分页
-    renderAndPaginate(html, 0);
+    // 章尾导航
+    html += `
+      <div class="chapter-end-nav">
+        <button class="btn-chapter-end" id="bottom-prev" onclick="prevChapter()">← 上一章</button>
+        <button class="btn-chapter-end btn-chapter-end-next" id="bottom-next" onclick="nextChapter()">下一章 →</button>
+      </div>`;
 
-    // 保存阅读进度
+    content.innerHTML = html;
+
+    updateChapterInfo();
+    updateNavBtns();
+    updateProgressBar();
+
     Storage.setReadProgress(state.source, state.novelId, state.chapterId, state.chapterIdx);
 
   } catch (err) {
     console.error(err);
-    showPageError(`加载失败：${err.message}<br>
+    showContentError(`加载失败：${err.message}<br>
       <small style="color:var(--text-faint)">可能为跨域限制，可稍后重试或访问原站</small>`);
   } finally {
     state.isLoading = false;
-  }
-}
-
-// ===== 渲染内容并计算分页 =====
-function renderAndPaginate(html, targetPage) {
-  const canvas   = elCanvas();
-  const viewport = elViewport();
-
-  // 先关闭动画，避免分页计算时出现闪烁
-  canvas.classList.add('instant');
-  canvas.innerHTML = html;
-
-  // 等待两帧让浏览器完成布局
-  requestAnimationFrame(() => {
-    requestAnimationFrame(() => {
-      calcAndGo(targetPage);
-    });
-  });
-}
-
-// ===== 计算页数并跳转 =====
-function calcAndGo(targetPage) {
-  const viewport = elViewport();
-  const canvas   = elCanvas();
-
-  const vh = viewport.clientHeight;
-  state.pageHeight = vh;
-
-  // 清除旧的 column 布局残留，让内容自然流高
-  canvas.style.columnWidth = '';
-  canvas.style.height      = '';
-  canvas.style.transform   = '';
-
-  // 再给一帧让浏览器完成布局后读取真实高度
-  requestAnimationFrame(() => {
-    const totalHeight = canvas.scrollHeight;
-    state.totalPages = Math.max(1, Math.ceil(totalHeight / vh));
-
-    canvas.classList.remove('instant');
-
-    goToPage(Math.min(targetPage, state.totalPages - 1), false);
-    updatePageInfo();
     updateNavBtns();
-  });
-}
-
-// ===== 跳转到指定页 =====
-function goToPage(n, animate = true) {
-  const canvas = elCanvas();
-  state.currentPage = Math.max(0, Math.min(n, state.totalPages - 1));
-
-  if (!animate) {
-    canvas.classList.add('instant');
-    canvas.style.transform = `translateY(-${state.currentPage * state.pageHeight}px)`;
-    requestAnimationFrame(() => canvas.classList.remove('instant'));
-  } else {
-    canvas.style.transform = `translateY(-${state.currentPage * state.pageHeight}px)`;
-  }
-
-  updatePageInfo();
-  updateNavBtns();
-  updateProgressBar();
-}
-
-// ===== 翻页：下一页 =====
-function nextPage() {
-  if (state.currentPage < state.totalPages - 1) {
-    goToPage(state.currentPage + 1);
-  } else {
-    // 最后一页 → 加载下一章
-    nextChapter();
-  }
-}
-
-// ===== 翻页：上一页 =====
-function prevPage() {
-  if (state.currentPage > 0) {
-    goToPage(state.currentPage - 1);
-  } else {
-    // 第一页 → 加载上一章（跳到最后一页）
-    prevChapter();
   }
 }
 
@@ -207,7 +126,7 @@ function nextChapter() {
   if (ch) {
     state.chapterId = ch.num || ch.id;
     updateUrl();
-    loadChapter().then(() => goToPage(0, false));
+    loadChapter();
   }
 }
 
@@ -221,12 +140,7 @@ function prevChapter() {
   if (ch) {
     state.chapterId = ch.num || ch.id;
     updateUrl();
-    // 加载完后跳到最后一页
-    loadChapter().then(() => {
-      requestAnimationFrame(() => requestAnimationFrame(() => {
-        goToPage(state.totalPages - 1, false);
-      }));
-    });
+    loadChapter();
   }
 }
 
@@ -241,35 +155,38 @@ function updateUrl() {
   history.replaceState(null, '', '?' + qs.toString());
 }
 
-// ===== 更新底部页码显示 =====
-function updatePageInfo() {
+// ===== 更新章节信息显示 =====
+function updateChapterInfo() {
   const ch = state.chapters[state.chapterIdx];
   const chTitle = ch?.title || '';
-
-  if (elPageNum()) {
-    if (state.totalPages > 0) {
-      elPageNum().textContent = `第 ${state.currentPage + 1} 页 / 共 ${state.totalPages} 页`;
-    } else {
-      elPageNum().textContent = '—';
-    }
+  if (elChTitle() && chTitle) elChTitle().textContent = chTitle;
+  if (elChInfo()) {
+    const total = state.chapters.length;
+    elChInfo().textContent = total > 0
+      ? `第 ${state.chapterIdx + 1} 章 / 共 ${total} 章`
+      : '—';
   }
-  if (elPageCh())    elPageCh().textContent = chTitle;
-  if (elChTitle())   elChTitle().textContent = chTitle;
 }
 
 // ===== 更新按钮状态 =====
 function updateNavBtns() {
-  const isFirst = state.chapterIdx <= 0 && state.currentPage <= 0;
-  const isLast  = state.chapterIdx >= state.chapters.length - 1 && state.currentPage >= state.totalPages - 1;
-  if (elPrev()) elPrev().disabled = isFirst;
-  if (elNext()) elNext().disabled = isLast;
+  const isFirst = state.chapterIdx <= 0;
+  const isLast  = state.chapters.length > 0 && state.chapterIdx >= state.chapters.length - 1;
+  if (elPrev()) elPrev().disabled = isFirst || state.isLoading;
+  if (elNext()) elNext().disabled = isLast  || state.isLoading;
+
+  // 同步章末导航按钮
+  const bp = document.getElementById('bottom-prev');
+  const bn = document.getElementById('bottom-next');
+  if (bp) bp.disabled = isFirst;
+  if (bn) bn.disabled = isLast;
 }
 
-// ===== 进度条 =====
+// ===== 进度条（跟随页面滚动）=====
 function updateProgressBar() {
-  const pct = state.totalPages > 1
-    ? (state.currentPage / (state.totalPages - 1)) * 100
-    : 100;
+  const scrollTop = window.scrollY || document.documentElement.scrollTop;
+  const docHeight = document.documentElement.scrollHeight - window.innerHeight;
+  const pct = docHeight > 0 ? (scrollTop / docHeight) * 100 : 0;
   if (elProgress()) elProgress().style.width = pct.toFixed(1) + '%';
 }
 
@@ -282,8 +199,8 @@ function applyReaderTheme() {
   document.body.classList.add(`reader-theme-${state.readerTheme}`);
   document.body.style.background = 'var(--reader-bg)';
 
-  document.documentElement.style.setProperty('--reader-font-size',   state.fontSize + 'px');
-  document.documentElement.style.setProperty('--reader-line-height',  state.lineHeight);
+  document.documentElement.style.setProperty('--reader-font-size',  state.fontSize + 'px');
+  document.documentElement.style.setProperty('--reader-line-height', state.lineHeight);
 
   const fsEl = document.getElementById('font-size-display');
   if (fsEl) fsEl.textContent = state.fontSize + 'px';
@@ -300,18 +217,12 @@ function changeFontSize(delta) {
   state.fontSize = Math.max(12, Math.min(26, state.fontSize + delta));
   Storage.set('reader_fontSize', state.fontSize);
   applyReaderTheme();
-  // 重新分页（保留当前页比例）
-  const ratio = state.totalPages > 1 ? state.currentPage / (state.totalPages - 1) : 0;
-  requestAnimationFrame(() => requestAnimationFrame(() => {
-    calcAndGo(Math.round(ratio * (state.totalPages - 1)));
-  }));
 }
 
 function changeLineHeight(lh) {
   state.lineHeight = lh;
   Storage.set('reader_lineHeight', lh);
   applyReaderTheme();
-  requestAnimationFrame(() => requestAnimationFrame(() => calcAndGo(0)));
 }
 
 function changeReaderTheme(theme) {
@@ -386,19 +297,14 @@ function openTocModal() {
     list.appendChild(item);
   });
 
-  // 定位到当前章节
   setTimeout(() => {
     list.querySelectorAll('.chapter-item')[state.chapterIdx]?.scrollIntoView({ block: 'center' });
   }, 60);
 }
 
-// ===== 显示页内错误 =====
-function showPageError(htmlMsg) {
-  elCanvas().style.columnWidth = '';
-  elCanvas().style.height      = '';
-  elCanvas().style.transform   = '';
-  elCanvas().style.width       = '';
-  elCanvas().innerHTML = `
+// ===== 显示内容区错误 =====
+function showContentError(htmlMsg) {
+  elContent().innerHTML = `
     <div class="page-error">
       <span style="font-size:40px">⚠️</span>
       <p>${htmlMsg}</p>
@@ -409,9 +315,9 @@ function showPageError(htmlMsg) {
 
 // ===== 绑定所有事件 =====
 function bindEvents() {
-  // 按钮
-  elPrev()?.addEventListener('click', prevPage);
-  elNext()?.addEventListener('click', nextPage);
+  elPrev()?.addEventListener('click', prevChapter);
+  elNext()?.addEventListener('click', nextChapter);
+
   document.getElementById('btn-settings')?.addEventListener('click', () => {
     state.settingsOpen = !state.settingsOpen;
     document.getElementById('settings-panel')?.classList.toggle('open', state.settingsOpen);
@@ -428,60 +334,27 @@ function bindEvents() {
     s.addEventListener('click', () => changeReaderTheme(s.dataset.theme));
   });
 
-  // ── 点击翻页（上1/3 上一页 | 下1/3 下一页 | 中间 显隐导航）──
-  elViewport()?.addEventListener('click', e => {
+  // 点击正文中间区域 显示/隐藏导航栏
+  document.getElementById('reader-content')?.addEventListener('click', e => {
     if (state.settingsOpen) {
       state.settingsOpen = false;
       document.getElementById('settings-panel')?.classList.remove('open');
       return;
     }
-    const vh   = elViewport().clientHeight;
-    const zone = e.clientY / vh;
-    if (zone < 0.3)      prevPage();
-    else if (zone > 0.7) nextPage();
-    else                 toggleNav();
+    // 只有点击非按钮区域才切换导航
+    if (!e.target.closest('button, a')) {
+      toggleNav();
+    }
   });
 
-  // ── 触摸滑动翻页（上下滑）──
-  let touchStartX = 0, touchStartY = 0;
-  elViewport()?.addEventListener('touchstart', e => {
-    touchStartX = e.touches[0].clientX;
-    touchStartY = e.touches[0].clientY;
-  }, { passive: true });
-  elViewport()?.addEventListener('touchend', e => {
-    const dx = e.changedTouches[0].clientX - touchStartX;
-    const dy = e.changedTouches[0].clientY - touchStartY;
-    if (Math.abs(dy) > Math.abs(dx) && Math.abs(dy) > 40) {
-      dy < 0 ? nextPage() : prevPage();
-    }
-  }, { passive: true });
+  // 滚动更新进度条
+  window.addEventListener('scroll', updateProgressBar, { passive: true });
 
-  // ── 键盘翻页 ──
+  // 键盘导航
   document.addEventListener('keydown', e => {
-    if (['ArrowDown', 'ArrowRight', 'PageDown', ' '].includes(e.key)) { e.preventDefault(); nextPage(); }
-    if (['ArrowUp',   'ArrowLeft',  'PageUp'].includes(e.key))        { e.preventDefault(); prevPage(); }
+    if (['ArrowRight', 'PageDown'].includes(e.key)) { e.preventDefault(); nextChapter(); }
+    if (['ArrowLeft',  'PageUp'].includes(e.key))   { e.preventDefault(); prevChapter(); }
   });
-
-  // ── 窗口大小改变重新分页 ──
-  let resizeTimer;
-  window.addEventListener('resize', () => {
-    clearTimeout(resizeTimer);
-    resizeTimer = setTimeout(() => {
-      // 保留比例
-      const ratio = state.totalPages > 1 ? state.currentPage / (state.totalPages - 1) : 0;
-      calcAndGo(Math.round(ratio * Math.max(1, state.totalPages - 1)));
-    }, 250);
-  });
-
-  // 首次进入提示
-  if (!Storage.get('reader_hint_shown')) {
-    const hint = document.getElementById('tap-hint');
-    if (hint) {
-      hint.style.display = 'flex';
-      setTimeout(() => hint.remove(), 3000);
-    }
-    Storage.set('reader_hint_shown', true);
-  }
 }
 
 document.addEventListener('DOMContentLoaded', init);

@@ -2,7 +2,7 @@
 <html lang="zh-CN" data-theme="dark">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <title>阅读 - 日文小说</title>
@@ -33,20 +33,14 @@
   <div class="progress-bar-fill" id="progress-fill"></div>
 </div>
 
-<!-- ★ 翻页视口 ★ -->
-<div class="page-viewport" id="page-viewport">
-  <div class="page-canvas" id="page-canvas">
+<!-- 正文内容区 -->
+<div class="reader-content-wrap">
+  <div class="reader-content" id="reader-content">
     <div class="page-loading">
       <div class="spinner"></div>
       <span>正在加载章节…</span>
     </div>
   </div>
-</div>
-
-<!-- 点击区提示（仅首次）-->
-<div class="tap-hint-overlay" id="tap-hint" style="display:none">
-  <div class="tap-hint-top">▲</div>
-  <div class="tap-hint-bottom">▼</div>
 </div>
 
 <!-- 设置面板 -->
@@ -78,14 +72,13 @@
   </div>
 </div>
 
-<!-- 底部翻页导航栏 -->
+<!-- 底部章节导航栏 -->
 <div class="reader-bottom-nav" id="reader-bottom-nav">
-  <button class="btn-chapter" id="btn-prev" disabled>↑ 上一页</button>
+  <button class="btn-chapter" id="btn-prev" disabled>← 上一章</button>
   <div class="page-info-center">
-    <span class="page-num-text"   id="page-num-display">—</span>
-    <span class="page-chapter-text" id="page-chapter-display"></span>
+    <span class="page-num-text" id="chapter-info-display">—</span>
   </div>
-  <button class="btn-chapter" id="btn-next">下一页 ↓</button>
+  <button class="btn-chapter" id="btn-next">下一章 →</button>
 </div>
 
 <script src="assets/js/config.js"></script>
