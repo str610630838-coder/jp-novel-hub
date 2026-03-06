@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>阅读 - 日文小说</title>
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📖</text></svg>">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500&family=Noto+Serif+JP:wght@400;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/css/style.css">
+</head>
+<body class="reader-body reader-theme-dark">
+
+<!-- 顶部导航 -->
+<nav class="reader-nav" id="reader-nav">
+  <div class="reader-nav-inner">
+    <a id="novel-back-title" href="javascript:history.back()" class="back-link" style="margin-bottom:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:180px">
+      ← 返回
+    </a>
+    <span class="reader-title" id="reader-chapter-title"></span>
+    <button class="icon-btn" id="btn-toc" title="目录">☰</button>
+    <button class="icon-btn" id="btn-settings" title="显示设置">⚙️</button>
+    <button class="icon-btn" id="theme-toggle" title="切换主题">🌙</button>
+  </div>
+</nav>
+
+<!-- 阅读进度条 -->
+<div class="progress-bar-wrap">
+  <div class="progress-bar-fill" id="progress-fill"></div>
+</div>
+
+<!-- 设置面板 -->
+<div class="settings-panel" id="settings-panel">
+  <div class="settings-group">
+    <div class="settings-label">字体大小</div>
+    <div class="font-size-ctrl">
+      <button id="btn-font-dec">A−</button>
+      <span id="font-size-display">17px</span>
+      <button id="btn-font-inc">A+</button>
+    </div>
+  </div>
+  <div class="settings-group">
+    <div class="settings-label">行间距</div>
+    <div class="settings-row">
+      <button class="setting-btn" data-lh="1.6">紧凑</button>
+      <button class="setting-btn active" data-lh="2.0">标准</button>
+      <button class="setting-btn" data-lh="2.4">宽松</button>
+    </div>
+  </div>
+  <div class="settings-group">
+    <div class="settings-label">背景主题</div>
+    <div class="theme-swatches">
+      <div class="theme-swatch swatch-white active" data-theme="white" title="白色"></div>
+      <div class="theme-swatch swatch-sepia" data-theme="sepia" title="米黄"></div>
+      <div class="theme-swatch swatch-dark" data-theme="dark" title="深色"></div>
+      <div class="theme-swatch swatch-deep" data-theme="deep" title="纯黑"></div>
+    </div>
+  </div>
+  <div class="settings-group">
+    <div class="settings-label">最大宽度</div>
+    <div class="settings-row">
+      <button class="setting-btn" onclick="document.documentElement.style.setProperty('--max-read','580px')">窄</button>
+      <button class="setting-btn active" onclick="document.documentElement.style.setProperty('--max-read','740px')">标准</button>
+      <button class="setting-btn" onclick="document.documentElement.style.setProperty('--max-read','920px')">宽</button>
+    </div>
+  </div>
+</div>
+
+<!-- 阅读正文 -->
+<main class="reader-main">
+  <h1 class="chapter-heading" id="chapter-heading"></h1>
+  <div class="reader-content" id="reader-content">
+    <div class="loading-wrap">
+      <div class="spinner"></div>
+      <span>正在加载章节…</span>
+    </div>
+  </div>
+</main>
+
+<!-- 底部导航 -->
+<div class="reader-bottom-nav" id="reader-bottom-nav">
+  <button class="btn-chapter" id="btn-prev" disabled>← 上一章</button>
+  <span class="nav-chapter-info" id="nav-chapter-info"></span>
+  <button class="btn-chapter" id="btn-next">下一章 →</button>
+</div>
+
+<script src="assets/js/config.js"></script>
+<script src="assets/js/api.js"></script>
+<script src="assets/js/ui.js"></script>
+<script src="assets/js/reader.js"></script>
+</body>
+</html>

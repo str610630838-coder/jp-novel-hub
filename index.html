@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>日文小说阅读器</title>
+  <meta name="description" content="汇聚なろう、青空文庫、カクヨム、ハーメルン，在线阅读日文小说原著">
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📚</text></svg>">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;700&family=Noto+Serif+JP:wght@400;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/css/style.css">
+</head>
+<body>
+
+<!-- 导航栏 -->
+<nav class="navbar">
+  <div class="nav-inner">
+    <a href="index.html" class="nav-logo">
+      <span class="logo-icon">📚</span>
+      <span class="logo-text">日文小说</span>
+    </a>
+    <div class="nav-search">
+      <input type="search" id="nav-search-input" placeholder="搜索小说、作者…" autocomplete="off">
+      <button id="nav-search-btn">搜索</button>
+    </div>
+    <div class="nav-actions">
+      <button class="icon-btn" id="theme-toggle" title="切换主题">🌙</button>
+    </div>
+  </div>
+</nav>
+
+<!-- 英雄区 -->
+<section class="hero">
+  <h1>探索日文小说世界</h1>
+  <p>汇聚なろう · 青空文庫 · カクヨム · ハーメルン，在线阅读日文原著</p>
+  <div class="search-box">
+    <input type="search" id="main-search" placeholder="输入书名、作者名或关键词…" autocomplete="off">
+    <button id="search-btn">🔍 搜索</button>
+  </div>
+  <div class="source-tabs">
+    <button class="source-tab active" data-source="narou">📘 小説家になろう</button>
+    <button class="source-tab" data-source="aozora">🍃 青空文庫</button>
+    <button class="source-tab" data-source="kakuyomu">📗 カクヨム</button>
+    <button class="source-tab" data-source="hameln">📙 ハーメルン</button>
+  </div>
+</section>
+
+<!-- 结果区 -->
+<section class="results-section">
+  <div class="results-header">
+    <h2 id="results-title">正在加载…</h2>
+    <div class="sort-options" id="sort-group">
+      <select id="sort-select">
+        <option value="weekly">本周排行</option>
+        <option value="hyoka">综合评分</option>
+        <option value="new">最新更新</option>
+        <option value="favnovelcnt">收藏数</option>
+        <option value="impressioncnt">感想数</option>
+      </select>
+    </div>
+  </div>
+  <div class="novel-grid" id="novel-grid"></div>
+  <div class="pagination" id="pagination"></div>
+</section>
+
+<footer>
+  <p>本站为小说检索入口，内容版权归各原平台及作者所有 ·
+    <a href="https://syosetu.com" target="_blank">なろう</a> ·
+    <a href="https://www.aozora.gr.jp" target="_blank">青空文庫</a> ·
+    <a href="https://kakuyomu.jp" target="_blank">カクヨム</a> ·
+    <a href="https://syosetu.org" target="_blank">ハーメルン</a>
+  </p>
+</footer>
+
+<script src="assets/js/config.js"></script>
+<script src="assets/js/api.js"></script>
+<script src="assets/js/ui.js"></script>
+<script src="assets/js/index.js"></script>
+</body>
+</html>
