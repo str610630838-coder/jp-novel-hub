@@ -2,7 +2,7 @@
 <html lang="zh-CN" data-theme="dark">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>阅读 - 日文小说</title>
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📖</text></svg>">
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -12,14 +12,15 @@
 </head>
 <body class="reader-body reader-theme-dark">
 
-<!-- 顶部导航 -->
+<!-- 顶部导航栏 -->
 <nav class="reader-nav" id="reader-nav">
   <div class="reader-nav-inner">
-    <a id="novel-back-title" href="javascript:history.back()" class="back-link" style="margin-bottom:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:180px">
+    <a id="btn-back" href="javascript:history.back()" class="back-link"
+       style="margin-bottom:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:160px;flex-shrink:0">
       ← 返回
     </a>
     <span class="reader-title" id="reader-chapter-title"></span>
-    <button class="icon-btn" id="btn-toc" title="目录">☰</button>
+    <button class="icon-btn" id="btn-toc"      title="目录">☰</button>
     <button class="icon-btn" id="btn-settings" title="显示设置">⚙️</button>
     <button class="icon-btn" id="theme-toggle" title="切换主题">🌙</button>
   </div>
@@ -28,6 +29,22 @@
 <!-- 阅读进度条 -->
 <div class="progress-bar-wrap">
   <div class="progress-bar-fill" id="progress-fill"></div>
+</div>
+
+<!-- ★ 翻页视口 ★ -->
+<div class="page-viewport" id="page-viewport">
+  <div class="page-canvas" id="page-canvas">
+    <div class="page-loading">
+      <div class="spinner"></div>
+      <span>正在加载章节…</span>
+    </div>
+  </div>
+</div>
+
+<!-- 点击区提示（仅首次）-->
+<div class="tap-hint-overlay" id="tap-hint" style="display:none">
+  <div class="tap-hint-left">◀</div>
+  <div class="tap-hint-right">▶</div>
 </div>
 
 <!-- 设置面板 -->
@@ -51,38 +68,22 @@
   <div class="settings-group">
     <div class="settings-label">背景主题</div>
     <div class="theme-swatches">
-      <div class="theme-swatch swatch-white active" data-theme="white" title="白色"></div>
-      <div class="theme-swatch swatch-sepia" data-theme="sepia" title="米黄"></div>
-      <div class="theme-swatch swatch-dark" data-theme="dark" title="深色"></div>
-      <div class="theme-swatch swatch-deep" data-theme="deep" title="纯黑"></div>
-    </div>
-  </div>
-  <div class="settings-group">
-    <div class="settings-label">最大宽度</div>
-    <div class="settings-row">
-      <button class="setting-btn" onclick="document.documentElement.style.setProperty('--max-read','580px')">窄</button>
-      <button class="setting-btn active" onclick="document.documentElement.style.setProperty('--max-read','740px')">标准</button>
-      <button class="setting-btn" onclick="document.documentElement.style.setProperty('--max-read','920px')">宽</button>
+      <div class="theme-swatch swatch-white"  data-theme="white" title="白色"></div>
+      <div class="theme-swatch swatch-sepia"  data-theme="sepia" title="米黄"></div>
+      <div class="theme-swatch swatch-dark active" data-theme="dark"  title="深色"></div>
+      <div class="theme-swatch swatch-deep"   data-theme="deep"  title="纯黑"></div>
     </div>
   </div>
 </div>
 
-<!-- 阅读正文 -->
-<main class="reader-main">
-  <h1 class="chapter-heading" id="chapter-heading"></h1>
-  <div class="reader-content" id="reader-content">
-    <div class="loading-wrap">
-      <div class="spinner"></div>
-      <span>正在加载章节…</span>
-    </div>
-  </div>
-</main>
-
-<!-- 底部导航 -->
+<!-- 底部翻页导航栏 -->
 <div class="reader-bottom-nav" id="reader-bottom-nav">
-  <button class="btn-chapter" id="btn-prev" disabled>← 上一章</button>
-  <span class="nav-chapter-info" id="nav-chapter-info"></span>
-  <button class="btn-chapter" id="btn-next">下一章 →</button>
+  <button class="btn-chapter" id="btn-prev" disabled>← 上一页</button>
+  <div class="page-info-center">
+    <span class="page-num-text"   id="page-num-display">—</span>
+    <span class="page-chapter-text" id="page-chapter-display"></span>
+  </div>
+  <button class="btn-chapter" id="btn-next">下一页 →</button>
 </div>
 
 <script src="assets/js/config.js"></script>
